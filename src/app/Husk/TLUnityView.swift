@@ -330,7 +330,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
 
     /// A game asks for the keyboard when its text field is tapped. The keyboard belongs to this view; what it types goes
     /// to the game, and a strip above the keyboard shows the text, because in landscape the keyboard covers the game's field.
-    override var canBecomeFirstResponder: Bool { engine == .cocos || engine == .sdl || engine == .minecraft || engine == .flutter || engine == .java }
+    override var canBecomeFirstResponder: Bool { engine == .unity || engine == .cocos || engine == .sdl || engine == .minecraft || engine == .flutter || engine == .java }
     var hasText: Bool { true }
     var autocorrectionType: UITextAutocorrectionType = .no
     var autocapitalizationType: UITextAutocapitalizationType = .none
@@ -367,7 +367,7 @@ final class TLUnityUIView: UIView, UIKeyInput {
         bar.addSubview(done)
         return bar
     }()
-    override var inputAccessoryView: UIView? { engine == .cocos || engine == .sdl || engine == .minecraft ? keyboardBar : nil }
+    override var inputAccessoryView: UIView? { engine == .unity || engine == .cocos || engine == .sdl || engine == .minecraft ? keyboardBar : nil }
 
     func insertText(_ text: String) {
         if engine == .java {
@@ -380,6 +380,57 @@ final class TLUnityUIView: UIView, UIKeyInput {
             if text == "\n", !husk_flutter_text_multiline() { husk_flutter_text_action() } else { husk_flutter_insert_text(text) }
             return
         }
+        if engine == .unity {
+            if text == "\n" { finishTyping(); return }
+            for scalar in text.unicodeScalars {
+                let ch = scalar.value
+                var keycode = 0
+                var meta = 0
+                if ch >= 65 && ch <= 90 { keycode = 29 + Int(ch - 65); meta = 1 }
+                else if ch >= 97 && ch <= 122 { keycode = 29 + Int(ch - 97) }
+                else if ch >= 48 && ch <= 57 { keycode = ch == 48 ? 7 : 7 + Int(ch - 48) }
+                else {
+                    switch ch {
+                    case 32: keycode = 62
+                    case 44: keycode = 55
+                    case 46: keycode = 56
+                    case 47: keycode = 76
+                    case 59: keycode = 74
+                    case 39: keycode = 75
+                    case 45: keycode = 69
+                    case 61: keycode = 70
+                    case 91: keycode = 71
+                    case 93: keycode = 72
+                    case 92: keycode = 73
+                    case 96: keycode = 68
+                    case 33: keycode = 8; meta = 1
+                    case 64: keycode = 77; meta = 1
+                    case 35: keycode = 10; meta = 1
+                    case 36: keycode = 11; meta = 1
+                    case 37: keycode = 12; meta = 1
+                    case 94: keycode = 13; meta = 1
+                    case 38: keycode = 14; meta = 1
+                    case 42: keycode = 17; meta = 1
+                    case 40: keycode = 162; meta = 1
+                    case 41: keycode = 163; meta = 1
+                    case 95: keycode = 69; meta = 1
+                    case 43: keycode = 70; meta = 1
+                    case 58: keycode = 74; meta = 1
+                    case 34: keycode = 75; meta = 1
+                    case 60: keycode = 71; meta = 1
+                    case 62: keycode = 72; meta = 1
+                    case 63: keycode = 76; meta = 1
+                    case 126: keycode = 68; meta = 1
+                    default: keycode = 0
+                    }
+                }
+                husk_unity_key(0, Int32(keycode), Int32(ch), Int32(meta))
+                husk_unity_key(1, Int32(keycode), Int32(ch), Int32(meta))
+                typed += String(scalar)
+            }
+            typedLabel.text = typed
+            return
+        }
         if text == "\n" { finishTyping(); return }
         typed += text
         typedLabel.text = typed
@@ -389,6 +440,13 @@ final class TLUnityUIView: UIView, UIKeyInput {
     func deleteBackward() {
         if engine == .java { husk_java_delete_backward(); return }
         if engine == .flutter { husk_flutter_delete_backward(); return }
+        if engine == .unity {
+            husk_unity_key(0, 67, 0, 0)
+            husk_unity_key(1, 67, 0, 0)
+            if !typed.isEmpty { typed.removeLast() }
+            typedLabel.text = typed
+            return
+        }
         if !typed.isEmpty { typed.removeLast() }
         typedLabel.text = typed
         if engine == .sdl { husk_sdl_key(67, 1); husk_sdl_key(67, 0) }   // KEYCODE_DEL
@@ -400,7 +458,8 @@ final class TLUnityUIView: UIView, UIKeyInput {
 
     /// Return, or the Done button: what Android's "done" action does -- the game gets a newline, and the keyboard goes.
     private func finishTyping() {
-        if engine == .sdl { husk_sdl_key(66, 1); husk_sdl_key(66, 0) }   // KEYCODE_ENTER
+        if engine == .unity { husk_unity_key(0, 66, 10, 0); husk_unity_key(1, 66, 10, 0) }
+        else if engine == .sdl { husk_sdl_key(66, 1); husk_sdl_key(66, 0) }   // KEYCODE_ENTER
         else if engine == .minecraft { husk_ga_editor_action() }        // the field's own action: send the chat, name the world
         else { husk_cocos_insert_text("\n") }
         resignFirstResponder()
@@ -587,6 +646,13 @@ struct TLUnityScreen: UIViewRepresentable {
         let view = TLUnityUIView(apk: apk, extraApks: extraApks, dataDir: dataDir, engine: engine, portrait: portrait, scale: scale)
         shared[apk] = view
         return view
+    }
+
+    static func focusKeyboard(apk: String) {
+        guard let view = shared[apk] else { return }
+        view.keyboardType = .default
+        view.isSecureTextEntry = false
+        _ = view.becomeFirstResponder()
     }
 
     func makeUIView(context: Context) -> TLUnityUIView {
@@ -855,6 +921,12 @@ struct TLCocosAttemptView: View {
                 Label("Close", systemImage: "xmark").font(.system(size: 13, weight: .semibold))
             }
             .tint(.white)
+            if engine == .unity {
+                Button { TLUnityScreen.focusKeyboard(apk: app.apks.first ?? "") } label: {
+                    Label("Keyboard", systemImage: "keyboard").font(.system(size: 12, weight: .semibold))
+                }
+                .tint(.white)
+            }
             if engine == .flutter {
                 Button { husk_flutter_back() } label: {
                     Label("Back", systemImage: "chevron.backward").font(.system(size: 13, weight: .semibold))

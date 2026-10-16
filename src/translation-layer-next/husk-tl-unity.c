@@ -23,6 +23,7 @@ void tl_hle_configure(const char *pkg, const char *apk, const char *data, int w,
 jobj *tl_hle_activity(void);
 void tl_set_data_dir(const char *dir);
 void tl_nwindow_configure(int w, int h, void *layer);
+extern jobj *tl_input_text_key_event(int action, int keycode, int unicode, int meta, int64_t down_ms, int64_t event_ms);
 
 static struct {
     tl_unity_config cfg;
@@ -253,6 +254,15 @@ static void inject(jobj *ev)
     if (fn) { fn(tl_jni_env(), U.player, ev, 0); if (tl_jni_pending()) tl_jni_clear(); }
     tl_jni_unref(ev);
 }
+void tl_unity_key(int action, int keycode, int unicode, int meta)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    int64_t now_ms = (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    jobj *ev = tl_input_text_key_event(action, keycode, unicode, meta, now_ms, now_ms);
+    inject(ev);
+}
+
 static void pad_key(jobj *ev, int device, int action, int keycode, int64_t down_ms, int64_t event_ms)
 { (void)device; (void)action; (void)keycode; (void)down_ms; (void)event_ms; inject(ev); }
 static void pad_motion(jobj *ev, int device, int source, int64_t down_ms, int64_t event_ms)

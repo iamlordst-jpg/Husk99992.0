@@ -44,6 +44,8 @@ unsigned long tl_unity_frames(void);
 /* Send a connected controller's buttons and sticks to this engine (husk-tl-gamepad.h). */
 void tl_unity_register_pad_sink(void);
 void tl_unity_touch(int phase, int id, float x, float y);
+/* Inject an Android key event into Unity. action is 0 (down) or 1 (up). */
+void tl_unity_key(int action, int keycode, int unicode, int meta);
 
 /* How the last stretch went: frames per second, and the mean and worst time inside one nativeRender call. Resets what it measured. */
 typedef struct tl_unity_perf { double fps, mean_ms, max_ms; } tl_unity_perf;
