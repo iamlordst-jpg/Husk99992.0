@@ -39,10 +39,10 @@ jobs:
 
       - name: Install build tools
         run: |
-          # Avoid Homebrew's automatic update and don't install host QEMU or
-          # Homebrew Rust/LLVM: Husk cross-builds QEMU and uses the runner's rustup.
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install meson ninja pkg-config xcodegen pyyaml
-          rustup show active-toolchain
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install meson ninja pkg-config xcodegen
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --disable-pip-version-check PyYAML
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Add iOS Rust target
         run: rustup target add aarch64-apple-ios
