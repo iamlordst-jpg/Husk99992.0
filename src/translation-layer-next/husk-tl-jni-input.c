@@ -30,7 +30,7 @@ typedef struct motion {
     int source, device;                     /* 0: a touch screen, device 0 */
     bool joystick;                          /* the values are in axes[], by Android axis number */
     float axes[MAX_AXES];
-    int keycode, repeat, meta, scan;
+    int keycode, repeat, meta, scan, unicode;
 } motion;
 
 static jvalue vi(int i) { jvalue v; v.j = 0; v.i = i; return v; }
@@ -153,6 +153,15 @@ jobj *tl_input_key_event(int action, int keycode, int device, int source, int re
     return o;
 }
 
+/* A software keyboard event also carries the Unicode character UIKit produced. */
+jobj *tl_input_text_key_event(int action, int keycode, int unicode, int meta, int64_t down_ms, int64_t event_ms)
+{
+    jobj *o = tl_input_key_event(action, keycode, 0, 0x101, 0, down_ms, event_ms);
+    motion *m = (motion *)o->native;
+    if (m) { m->unicode = unicode; m->meta = meta; }
+    return o;
+}
+
 /* A controller's sticks, triggers and hat, as one MOVE event of a joystick source; axes is by Android axis number (MAX_AXES of them). */
 jobj *tl_input_joystick_event(int device, int source, int64_t down_ms, int64_t event_ms, const float *axes)
 {
@@ -203,8 +212,8 @@ static const tl_jhle k_input_hle[] = {
     K("android/view/KeyEvent", "getScanCode", "()I", ME_getScan), K("android/view/KeyEvent", "getDeviceId", "()I", ME_getDeviceId),
     K("android/view/KeyEvent", "getSource", "()I", ME_getSource), K("android/view/KeyEvent", "getEventTime", "()J", ME_getEventTime),
     K("android/view/KeyEvent", "getDownTime", "()J", ME_getDownTime), K("android/view/KeyEvent", "getFlags", "()I", ME_zeroI),
-    K("android/view/KeyEvent", "getModifiers", "()I", ME_zeroI), K("android/view/KeyEvent", "getUnicodeChar", "()I", ME_zeroI),
-    K("android/view/KeyEvent", "getUnicodeChar", "(I)I", ME_zeroI), K("android/view/KeyEvent", "isCanceled", "()Z", ME_isFalse),
+    K("android/view/KeyEvent", "getModifiers", "()I", ME_zeroI), K("android/view/KeyEvent", "getUnicodeChar", "()I", ME_getUnicodeChar),
+    K("android/view/KeyEvent", "getUnicodeChar", "(I)I", ME_getUnicodeChar), K("android/view/KeyEvent", "isCanceled", "()Z", ME_isFalse),
     K("android/view/KeyEvent", "isLongPress", "()Z", ME_isFalse), K("android/view/KeyEvent", "isSystem", "()Z", ME_isFalse),
     K("android/view/KeyEvent", "getCharacters", "()Ljava/lang/String;", ME_nullObj), K("android/view/KeyEvent", "getKeyCharacterMap", "()Landroid/view/KeyCharacterMap;", ME_nullObj),
     K("android/view/KeyEvent", "isGamepadButton", "(I)Z", KE_isGamepadButton),
