@@ -8,6 +8,7 @@ on:
     paths:
       - "src/**"
       - "scripts/**"
+      - "patches/**"
       - "project.yml"
       - "Husk.xcodeproj/**"
       - ".github/workflows/build-ipa.yml"
@@ -38,11 +39,23 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew update
-          brew install meson ninja pkg-config xcodegen qemu rust
+          # Avoid Homebrew's automatic update and don't install host QEMU or
+          # Homebrew Rust/LLVM: Husk cross-builds QEMU and uses the runner's rustup.
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install meson ninja pkg-config xcodegen pyyaml
+          rustup show active-toolchain
 
       - name: Add iOS Rust target
         run: rustup target add aarch64-apple-ios
+
+      - name: Restore compiled dependencies and source caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+            third_party/build/
+            third_party/sources/
+            third_party/gpu/
+          key: husk-ios-macos15-xcode16-${{ hashFiles('scripts/**', 'patches/**') }}
 
       - name: Build Husk and package IPA
         run: ./scripts/ci_build.sh build/Husk.ipa
