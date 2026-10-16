@@ -160,6 +160,20 @@ stage_qemu() {
     local log="$LOGS/qemu.log"
     done_stage qemu && { echo "[skip] qemu"; return 0; }
     apply_patch qemu-10.0.12-utm qemu-10.0.12-utm.patch
+    # QEMU's generated Meson cross file targets iOS, but its host OS is Darwin.
+    # Tell Meson not to execute test binaries compiled for iOS on the macOS runner.
+    if ! grep -q 'needs_exe_wrapper = true' "$dir/configure"; then
+        python3 - "$dir/configure" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = '  echo "[properties]" >> $cross\n'
+if needle not in text:
+    raise SystemExit("Could not find QEMU Meson cross-file properties section")
+path.write_text(text.replace(needle, needle + '  echo "needs_exe_wrapper = true" >> $cross\n', 1))
+PY
+    fi
     banner "building qemu (this is the long one)"
     rm -rf "$dir/_husk_build"; mkdir -p "$dir/_husk_build"
     ( cd "$dir/_husk_build" \
